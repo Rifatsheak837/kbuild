@@ -35,8 +35,11 @@ jobs:
           git fetch --depth=1 $(git remote | head -1) 7c6bbcca33e1734642601acf07a14140116fa956 || git fetch --depth=1 $(git remote | head -1) refs/heads/deprecated/android12-5.10-2024-05
           git checkout -f 7c6bbcca33e1734642601acf07a14140116fa956
           git fetch --shallow-since=2024-05-01 --tags $(git remote | head -1) refs/heads/deprecated/android12-5.10-2024-05 || true
-          git tag -l 'android12-5.10-2024-0*_r*' | xargs -r git tag -d
-          git describe --abbrev=12 || true
+          # Pin the exact kernel version suffix seen in the phone's /proc/version.
+          # scripts/setlocalversion cats .scmversion verbatim, so describe is skipped.
+          printf '%s' '-android12-9-00016-g7c6bbcca33e1-ab12029497' > .scmversion
+          echo "scmversion: $(cat .scmversion)"
+          grep -rn 'scmversion' ../build/ 2>/dev/null | head -10 || true
           grep -rn BUILD_NUMBER ../build/*.sh | head -5 || true
           git log -1 --format='%H %cd'
           ls -d ../prebuilts*/clang/host/linux-x86/clang-r* || true
@@ -47,6 +50,7 @@ jobs:
           BUILD_NUMBER=12029497 BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh
       - name: Check
         run: |
+          echo "scmversion after build: $(cat ~/k/common/.scmversion 2>/dev/null || echo MISSING)"
           cd ~/k/out/*/dist
           strings -a Image | grep -m1 "Linux version"
           ls -l
