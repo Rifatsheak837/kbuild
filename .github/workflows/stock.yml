@@ -1,0 +1,58 @@
+name: stock-gki-build
+on: workflow_dispatch
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+    steps:
+      - name: Free disk
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /opt/hostedtoolcache/CodeQL
+          df -h /
+      - name: Deps
+        run: |
+          git config --global user.name ci
+          git config --global user.email ci@example.com
+          sudo apt-get update
+          sudo apt-get install -y git flex bison build-essential zip curl libssl-dev libelf-dev bc cpio rsync lz4 xz-utils unzip python3
+          curl -s https://storage.googleapis.com/git-repo-downloads/repo -o ~/repo && chmod +x ~/repo
+      - name: Swap
+        run: |
+          sudo swapoff -a || true
+          sudo fallocate -l 8G /mnt/swapfile
+          sudo chmod 600 /mnt/swapfile
+          sudo mkswap /mnt/swapfile
+          sudo swapon /mnt/swapfile
+          free -h
+      - name: Sync
+        run: |
+          mkdir ~/k && cd ~/k
+          ~/repo init -u https://android.googlesource.com/kernel/manifest -b common-android12-5.10-2024-05 --depth=1 --no-tags
+          mkdir -p .repo/local_manifests
+          echo '<manifest><remove-project name="kernel/common"/><project path="common" name="kernel/common" remote="aosp" revision="7c6bbcca33e1734642601acf07a14140116fa956" upstream="refs/heads/deprecated/android12-5.10-2024-05"/></manifest>' > .repo/local_manifests/fix.xml
+          ~/repo sync -c -j4 --no-tags --no-clone-bundle
+          cd common
+          git fetch --depth=1 $(git remote | head -1) 7c6bbcca33e1734642601acf07a14140116fa956 || git fetch --depth=1 $(git remote | head -1) refs/heads/deprecated/android12-5.10-2024-05
+          git checkout -f 7c6bbcca33e1734642601acf07a14140116fa956
+          git fetch --shallow-since=2024-05-01 --tags $(git remote | head -1) refs/heads/deprecated/android12-5.10-2024-05 || true
+          git describe --tags --abbrev=12 || true
+          grep -rn BUILD_NUMBER ../build/*.sh | head -5 || true
+          git log -1 --format='%H %cd'
+          ls -d ../prebuilts*/clang/host/linux-x86/clang-r* || true
+          grep -h CLANG_VERSION ../common/build.config.* || true
+      - name: Build
+        run: |
+          cd ~/k
+          BUILD_NUMBER=12029497 BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh
+      - name: Check
+        run: |
+          cd ~/k/out/*/dist
+          strings -a Image | grep -m1 "Linux version"
+          ls -l
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stock-kernel
+          path: |
+            ~/k/out/*/dist/Image*
+            ~/k/out/*/dist/System.map
+            ~/k/out/*/common/.config
