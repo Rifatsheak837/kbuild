@@ -35,7 +35,8 @@ jobs:
           git fetch --depth=1 $(git remote | head -1) 7c6bbcca33e1734642601acf07a14140116fa956 || git fetch --depth=1 $(git remote | head -1) refs/heads/deprecated/android12-5.10-2024-05
           git checkout -f 7c6bbcca33e1734642601acf07a14140116fa956
           git fetch --shallow-since=2024-05-01 --tags $(git remote | head -1) refs/heads/deprecated/android12-5.10-2024-05 || true
-          git describe --tags --abbrev=12 || true
+          git tag -l 'android12-5.10-2024-0*_r*' | xargs -r git tag -d
+          git describe --abbrev=12 || true
           grep -rn BUILD_NUMBER ../build/*.sh | head -5 || true
           git log -1 --format='%H %cd'
           ls -d ../prebuilts*/clang/host/linux-x86/clang-r* || true
