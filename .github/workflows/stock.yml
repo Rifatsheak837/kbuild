@@ -36,10 +36,11 @@ jobs:
           git checkout -f 7c6bbcca33e1734642601acf07a14140116fa956
           # Pin the exact kernel version suffix seen in the phone's /proc/version.
           # scripts/setlocalversion cats .scmversion verbatim, so describe is skipped.
-          printf '%s' '-android12-9-00016-g7c6bbcca33e1-ab12029497' > .scmversion
+          printf '%s' '-android12-9-00016-g7c6bbcca33e1' > .scmversion
           echo "scmversion: $(cat .scmversion)"
           grep -rn 'scmversion' ../build/ 2>/dev/null | head -10 || true
           grep -rn BUILD_NUMBER ../build/*.sh | head -5 || true
+          grep -rn 'BUILD_NUMBER' ../build/ Makefile scripts/setlocalversion build.config* 2>/dev/null | head -20 || true
           git log -1 --format='%H %cd'
           ls -d ../prebuilts*/clang/host/linux-x86/clang-r* || true
           grep -h CLANG_VERSION ../common/build.config.* || true
@@ -52,7 +53,10 @@ jobs:
           echo "scmversion after build: $(cat ~/k/common/.scmversion 2>/dev/null || echo MISSING)"
           cd ~/k/out/*/dist
           cp ../common/.config built_config.txt
-          strings -a Image | grep -m2 -E '5\.10\.209-android12|^#1 SMP' || echo "VERSION STRING NOT FOUND"
+          strings -a Image | grep -E '^Linux version 5|5\.10\.209-android12' | head -3 || echo "VERSION STRING NOT FOUND"
+          echo "--- kernel.release: $(cat ../common/include/config/kernel.release)"
+          grep UTS_RELEASE ../common/include/generated/utsrelease.h || true
+          env | grep -iE 'BUILD_NUMBER|LOCALVERSION' || echo "no BUILD_NUMBER/LOCALVERSION in env"
           ls -l
       - uses: actions/upload-artifact@v4
         with:
